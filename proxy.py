@@ -68,41 +68,45 @@ async def send_to_v2(path: str, headers: dict, scrubbed_json: dict,v1_response_d
                 headers=headers,
                 json=scrubbed_json 
             )
-            print(f"⚡ [SHADOW] Successfully mirrored traffic to V2. Response code: {response.status_code}")
+            print(f"Successfully mirrored traffic to V2. Response code: {response.status_code}")
         except Exception as e:
            
-            print(f"⚠️ [SHADOW ERROR] Failed to send payload to V2: {e}")
+            print(f"Failed to send payload to V2: {e}")
 
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 async def interceptor(path: str, request: Request,background_tasks: BackgroundTasks):
     
     body_bytes = await request.body() 
-    # --- NEW FIX: Clean the headers ---
+    
     clean_headers = dict(request.headers)
-    clean_headers.pop("host", None) # Remove the 'host' header so httpx can generate a new one
-    # ----------------------------------
-
-    if request.method in ["POST", "PUT"]:
-        try:
-            # Parse raw bytes into a Python dictionary
-            body_dict = json.loads(body_bytes)
-            # Run our recursive scrubber
-            safe_payload = scrub_data(body_dict)
-            # Add the task to the event loop pool
-            background_tasks.add_task(send_to_v2, path, clean_headers, safe_payload)
-        except json.JSONDecodeError:
-            # If the request isn't JSON data, don't break the proxy
-            pass
+    clean_headers.pop("host", None) 
 
     v1_url = f"http://localhost:8001/{path}"
     async with httpx.AsyncClient() as client:
         v1_response = await client.request(
             method=request.method,
             url=v1_url,
-            headers=clean_headers, # Use our clean headers here!
+            headers=clean_headers, 
             content=body_bytes
         )
+
+
+    if request.method in ["POST", "PUT"]:
+        try:
+            print("Attempting to queue background task...")
+            body_dict = json.loads(body_bytes)
+            safe_payload = scrub_data(body_dict)
+            v1_dict=v1_response.json()
+            # Add the task to the event loop pool
+            background_tasks.add_task(send_to_v2, path, clean_headers, safe_payload,v1_dict)
+            print("Background task successfully queued!")
+        except json.JSONDecodeError:
+            # If the request isn't JSON data, then don't break the proxy
+            print(f"ERROR queueing shadow task: {repr(e)}")
+            pass
+
+    
     
     return Response(
         content=v1_response.content,
