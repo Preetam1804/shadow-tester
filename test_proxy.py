@@ -4,7 +4,8 @@ import httpx
 payload = {
     "item_name": "Mechanical Keyboard",
     "price": 120.50,
-    "user_id": 42
+    "user_id": 42,
+    "credit_card":"4111-2222-3333-4444"
 }
 
 print("Sending request to our Middleman Proxy (Port 8000)...")

@@ -1,6 +1,6 @@
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, BackgroundTasks
 import httpx
-
+import json
 app = FastAPI()
 
 def scrub_data(data:dict)->dict:
@@ -55,9 +55,10 @@ def scrub_data(data:dict)->dict:
     return scrubbed
 
 
-async def send_to_v2(path: str, headers: dict, scrubbed_json: dict):
+async def send_to_v2(path: str, headers: dict, scrubbed_json: dict,v1_response_data: dict):
     v2_url = f"http://localhost:8002/{path}"
-    
+    headers.pop("content-length", None)
+    headers.pop("Content-Length", None)
     # Open a dedicated, temporary client for this separate task
     async with httpx.AsyncClient() as client:
         try:
@@ -74,22 +75,33 @@ async def send_to_v2(path: str, headers: dict, scrubbed_json: dict):
 
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
-async def interceptor(path: str, request: Request):
+async def interceptor(path: str, request: Request,background_tasks: BackgroundTasks):
     
-    body = await request.body() 
-    v1_url = f"http://localhost:8001/{path}"
-    
+    body_bytes = await request.body() 
     # --- NEW FIX: Clean the headers ---
     clean_headers = dict(request.headers)
     clean_headers.pop("host", None) # Remove the 'host' header so httpx can generate a new one
     # ----------------------------------
 
+    if request.method in ["POST", "PUT"]:
+        try:
+            # Parse raw bytes into a Python dictionary
+            body_dict = json.loads(body_bytes)
+            # Run our recursive scrubber
+            safe_payload = scrub_data(body_dict)
+            # Add the task to the event loop pool
+            background_tasks.add_task(send_to_v2, path, clean_headers, safe_payload)
+        except json.JSONDecodeError:
+            # If the request isn't JSON data, don't break the proxy
+            pass
+
+    v1_url = f"http://localhost:8001/{path}"
     async with httpx.AsyncClient() as client:
         v1_response = await client.request(
             method=request.method,
             url=v1_url,
             headers=clean_headers, # Use our clean headers here!
-            content=body
+            content=body_bytes
         )
     
     return Response(
