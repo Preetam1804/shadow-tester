@@ -10,7 +10,7 @@ installDomStub();
 
 const SIZE = Number(process.argv[2] ?? 300);
 const { BODIES, SUN } = await import('../src/config/solar.js');
-const { bakeBody, bakeMoon, bakeRingTexture } = await import('../src/lib/textures.js');
+const { bakeBody, bakeMoon, bakeRingTexture, RING_TEX } = await import('../src/lib/textures.js');
 const { clamp, rng } = await import('../src/lib/math.js');
 const fs = await import('node:fs');
 
@@ -31,8 +31,11 @@ const aces = (x) => {
 function readTex(t) {
   if (!t) return null;
   const img = t.image;
-  const data = img.getContext('2d').getImageData().data;
-  return { data, w: img.width, h: img.height };
+  const cx = img?.getContext?.('2d');
+  // getImageData needs all four arguments in a browser, and a zero-sized
+  // canvas has no context to ask
+  if (!cx || !img.width || !img.height) return null;
+  return { data: cx.getImageData(0, 0, img.width, img.height).data, w: img.width, h: img.height };
 }
 function sample(tex, u, v) {
   const x = Math.min(tex.w - 1, Math.max(0, Math.floor(u * tex.w)));
@@ -338,7 +341,11 @@ for (const b of BODIES) {
       opacity: b.rings.opacity ?? 1,
     }, {});
   }
-  if (b.rings) writePng(`${outDir}ring-${b.id}.png`, readTex(bakeRingTexture(b.rings.tex, 5 + Math.round(b.radius * 3))).data, 1024, 4);
+  if (b.rings) {
+    const rt = readTex(bakeRingTexture(b.rings.tex, 5 + Math.round(b.radius * 3)));
+    if (rt.data.length !== RING_TEX.w * RING_TEX.h * 4) throw new Error(`ring texture is ${rt.data.length}B, expected ${RING_TEX.w * RING_TEX.h * 4}B`);
+    writePng(`${outDir}ring-${b.id}.png`, rt.data, RING_TEX.w, RING_TEX.h);
+  }
   tiles.push(px);
   flat.push(texes.map.data);
   writePng(`${outDir}map-${b.id}.png`, texes.map.data, texes.map.w, texes.map.h);

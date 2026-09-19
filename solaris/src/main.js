@@ -7,13 +7,30 @@ import { CameraRig } from './three/CameraRig.js';
 import { Interaction } from './three/Interaction.js';
 import { Overlay } from './ui/Overlay.js';
 import { SystemMap } from './ui/SystemMap.js';
-import { Preloader, nextFrame } from './ui/Preloader.js';
+import { Preloader } from './ui/Preloader.js';
 import { CHAPTERS, BODIES } from './config/solar.js';
 import { clamp, damp, smoothstep, sampleSeries } from './lib/math.js';
 
 import './styles/global.css';
 
 const prefersCalm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * Yield to the browser between bakes. rAF keeps us aligned with paint, but rAF
+ * stops entirely in a hidden or occluded pane — so race it against a timer, or
+ * a tab opened in the background never finishes loading.
+ */
+const nextFrame = () =>
+  new Promise((res) => {
+    let done = false;
+    const go = () => {
+      if (done) return;
+      done = true;
+      res();
+    };
+    requestAnimationFrame(go);
+    setTimeout(go, 240);
+  });
 const smallScreen = Math.min(innerWidth, innerHeight) < 620;
 const startQuality = prefersCalm || smallScreen ? 'balanced' : 'cinematic';
 
@@ -89,26 +106,61 @@ const LABELS = [
   'CHARTING NEPTUNE',
 ];
 
+const bootT0 = performance.now();
+const failed = [];
+
+const step = async (label, pct, fn) => {
+  pre.set(pct, label);
+  await nextFrame();
+  const t0 = performance.now();
+  try {
+    fn();
+    console.debug(`[sol] ${label.toLowerCase()} — ${(performance.now() - t0).toFixed(0)}ms`);
+    return true;
+  } catch (err) {
+    // one bad world must not cost the visitor the whole site
+    failed.push(`${label}: ${err?.message ?? err}`);
+    console.error(`[sol] ${label} failed after ${(performance.now() - t0).toFixed(0)}ms`, err);
+    return false;
+  }
+};
+
 (async function load() {
   for (let i = 0; i < BODIES.length; i++) {
-    pre.set(0.12 + (i / BODIES.length) * 0.6, LABELS[i] ?? 'BAKING SURFACES');
+    const spec = BODIES[i];
+    pre.set(0.12 + (i / BODIES.length) * 0.6, LABELS[i] ?? `BAKING ${spec.id.toUpperCase()}`);
     await nextFrame();
-    universe.addBody(BODIES[i]);
+    const t0 = performance.now();
+    const res = universe.addBodySafe(spec);
+    const ms = (performance.now() - t0).toFixed(0);
+    if (res.degraded) failed.push(`${spec.id} → flat shading`);
+    else if (res.skipped) failed.push(`${spec.id} skipped`);
+    console.debug(`[sol] ${spec.id.padEnd(9)} ${ms}ms${res.degraded ? ' (degraded)' : res.skipped ? ' (SKIPPED)' : ''}`);
   }
-  pre.set(0.78, 'LAYERING DEBRIS BELTS');
-  await nextFrame();
-  universe.finish();
+  await step('LAYERING DEBRIS BELTS', 0.78, () => universe.finish());
   pre.set(0.86, 'COMPILING SHADERS');
   await nextFrame();
-  try {
-    await engine.renderer.compileAsync(engine.scene, engine.camera);
-  } catch {
-    engine.renderer.compile(engine.scene, engine.camera);
-  }
+  // compileAsync can hang on some drivers, so it gets a deadline of its own
+  await Promise.race([
+    engine.renderer.compileAsync(engine.scene, engine.camera).catch(() => engine.renderer.compile(engine.scene, engine.camera)),
+    new Promise((r) => setTimeout(r, 6000)),
+  ]);
+  if (failed.length) pre.set(0.93, `${failed.length} WORLD${failed.length > 1 ? 'S' : ''} DEGRADED`);
   pre.set(0.95, 'SPOOLING CAMERA RIG');
   await nextFrame();
   boot();
-})();
+  if (failed.length) console.warn('[sol] degraded worlds:', failed.join(' · '));
+  console.debug(`[sol] ready in ${(performance.now() - bootT0).toFixed(0)}ms`);
+})().catch((err) => {
+  // last resort: the loader curtain must never be the thing the visitor sees
+  console.error('[sol] boot failed outside the bake loop', err);
+  try {
+    if (!rig) boot();
+  } catch (e2) {
+    console.error('[sol] could not start the rig either', e2);
+    pre.fail(String(err?.message ?? err));
+  }
+});
 
 /* ── boot ───────────────────────────────────────────────────────────── */
 function boot() {

@@ -420,9 +420,14 @@ function bakeCloud(w, h, kind, seed, turb = 5.5, coverage = 0.52) {
 
 /* ── rings ────────────────────────────────────────────────────────────── */
 
+/** the ring ramp is shared with the preview tool so the size can never drift
+ *  away from the buffer the writer fills (it did: `w*4` vs a 4-row loop) */
+export const RING_TEX = { w: 1024, h: 4 };
+
 function bakeRing(kind, seed = 5) {
-  const w = 1024;
-  const data = new Uint8ClampedArray(w * 4);
+  const w = RING_TEX.w;
+  const h = RING_TEX.h;
+  const data = new Uint8ClampedArray(w * h * 4);
   const r = rng(seed);
   const bands = [];
   const n = kind === 'uranus' ? 26 : 150;
@@ -446,7 +451,7 @@ function bakeRing(kind, seed = 5) {
     a *= 0.72 + 0.28 * Math.sin(p * 940 + Math.sin(p * 71) * 3) ** 2;
     col(clamp(0.2 + a * 0.8), c);
     const alpha = clamp(a) * (kind === 'uranus' ? 0.5 : 1);
-    for (let y = 0; y < 4; y++) {
+    for (let y = 0; y < h; y++) {
       const o = (y * w + x) * 4;
       data[o] = c[0];
       data[o + 1] = c[1];
@@ -522,10 +527,26 @@ export function bakeStarSprite(size = 64) {
  * Produce the full material set for one world.
  * `progress` is called between allocations so the preloader can breathe.
  */
+/** one flat colour + a touch of noise: what a world gets if its bake throws */
+function paintFlat(ctx) {
+  const { w, h, data, height, spec } = ctx;
+  const c = toRGB(spec.color ?? '#8b8578');
+  const r = rng((spec.seed ?? 3) * 7.7);
+  for (let i = 0; i < w * h; i++) {
+    const v = 0.86 + r() * 0.28;
+    const o = i * 4;
+    data[o] = c[0] * v;
+    data[o + 1] = c[1] * v;
+    data[o + 2] = c[2] * v;
+    data[o + 3] = 255;
+    height[i] = v * 0.06;
+  }
+}
+
 export function bakeBody(spec, size) {
   const w = size.w;
   const h = size.h;
-  const painter = PAINTERS[spec.kind] ?? paintRocky;
+  const painter = spec.kind === 'flat' ? paintFlat : PAINTERS[spec.kind] ?? paintRocky;
   const height = new Float32Array(w * h);
   // opaque by default: a canvas is premultiplied internally, so leaving alpha
   // at 0 would throw the rgb away before the texture is ever uploaded
@@ -577,7 +598,7 @@ export function bakeBody(spec, size) {
 
 export function bakeRingTexture(kind, seed) {
   const d = bakeRing(kind, seed);
-  const t = texFromCanvas(canvasFromImageData(d, 1024, 4), { srgb: true, wrapS: THREE.ClampToEdgeWrapping });
+  const t = texFromCanvas(canvasFromImageData(d, RING_TEX.w, RING_TEX.h), { srgb: true, wrapS: THREE.ClampToEdgeWrapping });
   return t;
 }
 

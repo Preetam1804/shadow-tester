@@ -114,7 +114,9 @@ export function makeSun(radius, shared, q) {
    PLANETS
    ══════════════════════════════════════════════════════════════════════ */
 export function makeBody(spec, shared, q, sunRadius) {
-  const texSize = q.tex >= 1024 ? { w: 1024, h: 512 } : { w: Math.min(768, q.tex * 1.5) | 0, h: Math.min(384, q.tex * 0.75) | 0 };
+  // q.tex *is* the map width; deriving it from ratios made every tier bake the
+  // same 768x384 and quietly cost perf machines 4x what they should
+  const texSize = { w: q.tex | 0, h: (q.tex >> 1) | 0 };
   const baked = bakeBody(
     {
       ...spec.tex,

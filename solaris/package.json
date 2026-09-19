@@ -8,12 +8,13 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "qa": "node tools/dom-check.mjs && node tools/shader-check.mjs && node tools/scene-check.mjs && node tools/preview.mjs 420",
+    "qa": "node tools/bake-check.mjs && node tools/dom-check.mjs && node tools/shader-check.mjs && node tools/scene-check.mjs && node tools/preview.mjs 420",
     "qa:dom": "node tools/dom-check.mjs",
     "qa:shaders": "node tools/shader-check.mjs",
     "qa:scene": "node tools/scene-check.mjs",
     "qa:textures": "node tools/preview.mjs",
-    "dev:host": "vite --host 0.0.0.0 --port 5173"
+    "dev:host": "vite --host 0.0.0.0 --port 5173",
+    "qa:bake": "node tools/bake-check.mjs"
   },
   "dependencies": {
     "lenis": "^1.3.4",

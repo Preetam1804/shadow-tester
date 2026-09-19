@@ -29,6 +29,19 @@ export class Preloader {
     if (this.ring) this.ring.style.strokeDashoffset = (326.7 * (1 - p)).toFixed(1);
   }
 
+  /** a fatal boot error still has to give the visitor something to look at */
+  fail(msg) {
+    this.set(1, 'DEGRADED');
+    if (this.status) {
+      this.status.textContent = 'BOOT FAILED — SEE CONSOLE';
+      this.status.title = msg;
+    }
+    this.el?.classList.add('loader--fail');
+    document.body.classList.add('ready');
+    this.el?.classList.add('loader--done');
+    setTimeout(() => this.el?.remove(), 1200);
+  }
+
   async done() {
     this.set(1, 'READY');
     await new Promise((r) => setTimeout(r, 420));

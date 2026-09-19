@@ -92,6 +92,28 @@ export class Universe {
     return body;
   }
 
+  /**
+   * addBody, but a painter that throws must never take the whole boot down with
+   * it: the world keeps its orbit, radius, moons and picking and only loses the
+   * baked surface. Returns { body, error } so the loader can report honestly.
+   */
+  addBodySafe(spec) {
+    try {
+      return { body: this.addBody(spec) };
+    } catch (err) {
+      console.error(`[sol] ${spec.id}: bake failed, falling back to flat shading`, err);
+      try {
+        const degraded = { ...spec, tex: { kind: 'flat', seed: spec.tex?.seed ?? 3, color: spec.color }, rings: undefined, clouds: undefined, night: undefined };
+        const body = this.addBody(degraded);
+        body.degraded = true;
+        return { body, error: err, degraded: true };
+      } catch (err2) {
+        console.error(`[sol] ${spec.id}: fallback failed too, world skipped`, err2);
+        return { error: err2, skipped: true };
+      }
+    }
+  }
+
   /** debris belts, the probe, its trail, the reticle */
   finish() {
     const q = this.q;

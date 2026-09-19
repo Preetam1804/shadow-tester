@@ -161,6 +161,13 @@ body.warping .fx-warp {
   mix-blend-mode: screen;
 }
 
+#loader.loader--fail #load-status {
+  color: #ff8a6a;
+}
+#loader.loader--fail .load__ring {
+  stroke: rgba(255, 120, 90, 0.55);
+}
+
 /* ══════════════════════════════════════════════════════════════════════
    header
    ══════════════════════════════════════════════════════════════════════ */
