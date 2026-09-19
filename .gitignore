@@ -16,6 +16,9 @@ eggs/
 .eggs/
 lib/
 lib64/
+# ...but solaris/src/lib/ is hand-written source (noise, texture baker, math),
+# not a build output — the blanket rules above would silently drop it.
+!solaris/src/lib/
 parts/
 sdist/
 var/

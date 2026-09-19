@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>SOL — An Interactive Odyssey Through The Solar System</title>
+    <meta
+      name="description"
+      content="A real-time 3D scroll journey past the Sun, eight planets and the Kuiper Belt. Procedural worlds, orbital camera, no pre-rendered video."
+    />
+    <meta name="theme-color" content="#04060c" />
+    <style>
+      /* Critical: keep the page black while WebGL boots so there is no white flash */
+      html,
+      body {
+        margin: 0;
+        background: #04060c;
+        color: #eef2f7;
+      }
+      #boot {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        font: 500 11px/1 ui-monospace, monospace;
+        letter-spacing: 0.32em;
+        color: #6d7686;
+        z-index: 100;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="boot">INITIALISING&nbsp;RENDERER</div>
+    <canvas id="gl" aria-hidden="true"></canvas>
+
+    <!-- ── ambient fx layers ─────────────────────────────────────────── -->
+    <div class="fx fx-grade" aria-hidden="true"></div>
+    <div class="fx fx-vig" aria-hidden="true"></div>
+    <div class="fx fx-flare" id="flare" aria-hidden="true">
+      <i class="fx-flare__streak"></i>
+      <i class="fx-flare__core"></i>
+    </div>
+    <div class="fx fx-warp" aria-hidden="true"></div>
+
+    <!-- ── chrome ────────────────────────────────────────────────────── -->
+    <header class="hdr">
+      <a class="brand" href="#top" data-top>
+        <svg viewBox="0 0 24 24" class="brand__mark" aria-hidden="true">
+          <circle cx="12" cy="12" r="4.1" />
+          <ellipse class="orb" cx="12" cy="12" rx="10.2" ry="4.2" transform="rotate(-24 12 12)" />
+          <circle class="moon" cx="21" cy="8.4" r="1.15" />
+        </svg>
+        <span class="brand__word">SOL</span>
+        <span class="brand__sub">an&nbsp;odyssey</span>
+      </a>
+
+      <div class="hdr__mid">
+        <span class="pill"><i class="dot dot--live"></i>live webgl · procedural worlds</span>
+      </div>
+
+      <div class="hdr__right">
+        <div class="seg" id="quality" role="group" aria-label="Render quality">
+          <button data-q="cinematic" class="is-on">Cinematic</button>
+          <button data-q="balanced">Balanced</button>
+          <button data-q="perf">Performance</button>
+        </div>
+        <button class="ghost" id="motion" aria-pressed="false">Motion: auto</button>
+      </div>
+    </header>
+
+    <nav class="rail" id="rail" aria-label="Chapters"></nav>
+
+    <aside class="telemetry" id="telemetry" aria-hidden="true">
+      <div class="tl__head"><span>TELEMETRY</span><i class="dot dot--live"></i></div>
+      <dl>
+        <div><dt>chapter</dt><dd id="tl-chapter">01 / 11</dd></div>
+        <div><dt>distance</dt><dd id="tl-au">0.00 AU</dd></div>
+        <div><dt>velocity</dt><dd id="tl-vel">0 u/s</dd></div>
+        <div><dt>focal</dt><dd id="tl-fov">45.0°</dd></div>
+        <div><dt>fps</dt><dd id="tl-fps">60</dd></div>
+      </dl>
+      <div class="tl__bar"><i id="tl-warp"></i></div>
+    </aside>
+
+    <aside class="map" id="map" aria-hidden="true">
+      <canvas id="map-canvas" width="260" height="260"></canvas>
+      <span class="map__label">SYSTEM MAP · ECLIPTIC PLANE</span>
+    </aside>
+
+    <div class="hint" id="hint">
+      <span class="hint__a">scroll</span>
+      <svg viewBox="0 0 12 22" aria-hidden="true"><path d="M6 1v18M1.5 14.5 6 19.5l4.5-5" /></svg>
+      <span class="hint__b">drag to look · click a world</span>
+    </div>
+
+    <div class="foot">
+      <div class="foot__prog"><i id="prog-fill"></i></div>
+      <div class="foot__meta">
+        <span id="foot-name">THE STAR</span>
+        <span id="foot-au">0.00 AU · 0.00 BKM</span>
+      </div>
+    </div>
+
+    <!-- ── scroll track (chapters are injected here) ─────────────────── -->
+    <main id="scroll" class="scroll"><span id="top"></span></main>
+
+    <!-- ── reticle / hover label ─────────────────────────────────────── -->
+    <div class="tag" id="tag"><i class="tag__dot"></i><span id="tag-name">—</span></div>
+    <div class="cursor" id="cursor"><i class="cursor__ring"></i><i class="cursor__dot"></i></div>
+
+    <!-- ── loader ────────────────────────────────────────────────────── -->
+    <div class="loader" id="loader">
+      <div class="loader__inner">
+        <div class="loader__num"><span id="load-pct">0</span><em>%</em></div>
+        <div class="loader__bar"><i id="load-bar"></i></div>
+        <div class="loader__status" id="load-status">COMPILING SHADERS</div>
+      </div>
+      <div class="loader__ring">
+        <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" class="lr-t"/><circle cx="60" cy="60" r="52" class="lr-p" id="load-ring"/></svg>
+      </div>
+    </div>
+
+    <noscript>
+      <div style="position:fixed;inset:0;display:grid;place-items:center;padding:8vw;font:400 14px/1.7 system-ui;text-align:center">
+        SOL is a real-time 3D experience and needs JavaScript plus WebGL.
+      </div>
+    </noscript>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
